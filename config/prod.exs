@@ -1,4 +1,5 @@
 use Mix.Config
+require Logger
 
 # For production, don't forget to configure the url host
 # to something meaningful, Phoenix uses this information
@@ -12,6 +13,33 @@ use Mix.Config
 config :mindwendel, MindwendelWeb.Endpoint,
   cache_static_manifest: "priv/static/cache_manifest.json"
 
+secret_key_base = System.get_env("SECRET_KEY_BASE")
+
+unless secret_key_base do
+  Logger.warn(
+    "Environment variable SECRET_KEY_BASE is missing. You can generate one by calling: mix phx.gen.secret"
+  )
+end
+
+url_host = System.get_env("URL_HOST")
+
+unless url_host do
+  Logger.warn(
+    "Environment variable URL_HOST is missing.The URL_HOST should be the domain name (wihtout protocol and port) for accessing your app."
+  )
+end
+
+config :mindwendel, MindwendelWeb.Endpoint,
+  url: [
+    host: url_host,
+    port: 80
+  ],
+  http: [
+    port: String.to_integer(System.get_env("PORT") || "4000"),
+    transport_options: [socket_opts: [:inet6]]
+  ],
+  secret_key_base: secret_key_base
+
 # Do not print debug messages in production
 config :logger, level: :info
 
@@ -21,6 +49,58 @@ config :mindwendel, :options,
       ["", "true"],
       String.trim(System.get_env("MW_FEATURE_BRAINSTORMING_TEASER") || "")
     )
+
+#
+# Configuring the mindwendel repo
+#
+# If the env variable `DATABASE_URL` is set,
+# we will us this to configure the repo endpoint.
+#
+database_url = System.get_env("DATABASE_URL")
+
+if database_url do
+  Logger.info("Environment variable DATABASE_URL is defined and used for Mindwendel.Repo")
+  config :mindwendel, Mindwendel.Repo, url: database_url
+else
+  Logger.info(
+    "Environment variable DATABASE_URL is missing. Expecting DATABASE_HOST, DATABASE_NAME, DATABASE_USER, DATABASE_USER_PASSWORD to be defined"
+  )
+
+  database_host = System.get_env("DATABASE_HOST")
+
+  unless database_host do
+    Logger.warn(
+      "Environment variable DATABASE_HOST is missing, e.g. ecto://USER:PASS@HOST/DATABASE"
+    )
+  end
+
+  database_name = System.get_env("DATABASE_NAME")
+
+  unless database_name do
+    Logger.warn("Environment variable DATABASE_NAME is missing, e.g. mindwendel_prod_db")
+  end
+
+  database_user = System.get_env("DATABASE_USER")
+
+  unless database_user do
+    Logger.warn("Environment variable DATABASE_USER is missing, e.g. mindwendel_prod_db_user")
+  end
+
+  database_user_password = System.get_env("DATABASE_USER_PASSWORD")
+
+  unless database_user_password do
+    Logger.warn(
+      "Environment variable DATABASE_USER_PASSWORD is missing, e.g. mindwendel_prod_db_user_password"
+    )
+  end
+
+  config :mindwendel, Mindwendel.Repo,
+    hostname: database_host,
+    username: database_user,
+    password: database_user_password,
+    database: database_name,
+    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10")
+end
 
 # ## SSL Support
 #
@@ -55,7 +135,3 @@ config :mindwendel, :options,
 #       force_ssl: [hsts: true]
 #
 # Check `Plug.SSL` for all available options in `force_ssl`.
-
-# Finally import the config/prod.secret.exs which loads secrets
-# and configuration from environment variables.
-# import_config "prod.secret.exs"
